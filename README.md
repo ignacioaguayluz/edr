@@ -25,7 +25,7 @@ kernel (eBPF CO-RE)                    user space (Go)
 
 ## Requirements
 
-Docker. Everything builds and runs in containers, so the host needs no Go or clang. The kernel (the Docker Desktop VM or a Linux host) must provide BTF (`/sys/kernel/btf/vmlinux`).
+Docker. Everything builds and runs in containers, so the host needs no Go or clang. The kernel (the Docker Desktop VM or a Linux host) must be 5.8 or newer (ring buffer, `pidfd_open`, `start_boottime`) and provide BTF (`/sys/kernel/btf/vmlinux`).
 
 ## Usage
 
@@ -37,7 +37,7 @@ make run ARGS="--dry-run --emit-events"
 make image-runtime && docker run --rm --privileged --pid=host edr-agent
 ```
 
-Kills target a process instance, not a bare PID. Every event carries the process start time from the kernel. The responder opens a pidfd, checks that `/proc/<pid>/stat` reports the same start time, and only then sends `SIGKILL` through the pidfd. A reused PID is reported as `"status":"gone","error":"pid reused by another process"` and is never signalled. An alert without a start time is not killed (`skipped`).
+Kills target a process instance, not a bare PID. Every event carries the process start time from the kernel. The responder opens a pidfd, checks that `/proc/<pid>/stat` reports the same start time, and only then sends `SIGKILL` through the pidfd. The check has the resolution of `/proc` start times (10 ms): a PID that wraps around and is reused within the same tick, before the pidfd is opened, would not be detected. A reused PID is reported as `"status":"gone","error":"pid reused by another process"` and is never signalled. An alert without a start time is not killed (`skipped`).
 
 Flags: `--rules DIR`, `--output FILE|-`, `--dry-run`, `--emit-events` (every event, not only alerts).
 

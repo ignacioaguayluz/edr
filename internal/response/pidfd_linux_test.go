@@ -64,12 +64,11 @@ func TestPidfdKillSparesProcessWithDifferentStartTime(t *testing.T) {
 	}
 }
 
-func TestPidfdKillReportsExitedProcessAsESRCH(t *testing.T) {
-	cmd := exec.Command("true")
-	if err := cmd.Run(); err != nil {
-		t.Fatal(err)
-	}
-	if err := pidfdKill(uint32(cmd.Process.Pid), 1); !errors.Is(err, syscall.ESRCH) {
+func TestPidfdKillReportsMissingProcessAsESRCH(t *testing.T) {
+	// PID_MAX_LIMIT is 2^22, so this pid is never assigned. A reaped child's
+	// pid would be flaky: another process may reuse it before pidfd_open.
+	const neverAssigned = 1<<22 + 1
+	if err := pidfdKill(neverAssigned, 1); !errors.Is(err, syscall.ESRCH) {
 		t.Fatalf("want ESRCH, got %v", err)
 	}
 }
