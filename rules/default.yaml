@@ -1,0 +1,55 @@
+# Default detection rules. Fields: see internal/telemetry/event.go (KnownFields).
+# Operators per condition (exactly one): equals, contains, startswith, endswith, in.
+# Conditions within a rule are AND-ed. action: alert (default) | kill.
+rules:
+  - id: EDR-001
+    title: Known cryptocurrency miner executed
+    severity: critical
+    kind: process_exec
+    action: kill
+    match:
+      - field: process.comm
+        in: [xmrig, minerd, cpuminer, xmr-stak]
+
+  - id: EDR-002
+    title: Shell spawned by a web server
+    severity: high
+    kind: process_exec
+    action: kill
+    match:
+      - field: process.comm
+        in: [sh, bash, dash, zsh]
+      - field: process.parent_comm
+        in: [nginx, apache2, httpd, php-fpm, node]
+
+  - id: EDR-003
+    title: Outbound connection to a common reverse-shell port
+    severity: high
+    kind: net_connect
+    match:
+      - field: network.dst_port
+        in: ["4444", "1337", "31337"]
+
+  - id: EDR-004
+    title: Credential store read
+    severity: medium
+    kind: file_open
+    match:
+      - field: file.path
+        in: [/etc/shadow, /etc/gshadow]
+
+  - id: EDR-005
+    title: Binary executed from a world-writable directory
+    severity: medium
+    kind: process_exec
+    match:
+      - field: process.exe
+        startswith: /tmp/
+
+  - id: EDR-006
+    title: Binary executed from shared memory
+    severity: high
+    kind: process_exec
+    match:
+      - field: process.exe
+        startswith: /dev/shm/
