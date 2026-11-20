@@ -1,0 +1,76 @@
+# edr
+
+A minimal Endpoint Detection and Response agent for Linux. eBPF probes collect process, file and network telemetry in the kernel; a YAML rule engine detects suspicious behavior; a responder can kill the offending process.
+
+## How it works
+
+```
+kernel (eBPF CO-RE)                    user space (Go)
+┌──────────────────────────┐   ring   ┌────────┐  ┌─────────┐  ┌───────────┐  ┌──────────┐  ┌───────┐
+│ sched_process_exec/exit  │  buffer  │ sensor │→ │ enrich  │→ │ detection │→ │ response │→ │ JSONL │
+│ sys_enter_openat/connect │ ───────→ │ decode │  │ (procs) │  │ (rules)   │  │ (kill)   │  │ sink  │
+└──────────────────────────┘          └────────┘  └─────────┘  └───────────┘  └──────────┘  └───────┘
+```
+
+| Package | Role |
+|---|---|
+| `internal/telemetry` | Kernel-independent event model and rule field names |
+| `internal/sensor/ebpf` | eBPF program (`bpf/edr.bpf.c`) and Go loader/decoder |
+| `internal/agent` | Pipeline and process-context enrichment (exe, args, parent) |
+| `internal/detection` | Rule model, YAML loader and engine |
+| `internal/response` | Kill action, dry-run, protected PIDs |
+| `internal/sink` | JSON Lines output |
+
+`agent`, `detection` and `response` depend only on interfaces and are unit-tested without a kernel.
+
+## Requirements
+
+Docker. Everything builds and runs in containers, so the host needs no Go or clang. The kernel (the Docker Desktop VM or a Linux host) must provide BTF (`/sys/kernel/btf/vmlinux`).
+
+## Usage
+
+```sh
+make test     # unit tests
+make e2e      # real kernel: sensor tests + full agent attack simulation
+make run      # run the agent with ./rules, alerts to stdout
+make run ARGS="--dry-run --emit-events"
+make image-runtime && docker run --rm --privileged --pid=host edr-agent
+```
+
+Flags: `--rules DIR`, `--output FILE|-`, `--dry-run`, `--emit-events` (every event, not only alerts).
+
+The agent needs root and the host PID namespace (`--privileged --pid=host` in Docker). The kernel reports host PIDs, so a namespaced agent would kill the wrong process.
+
+## Rules
+
+Every `*.yaml`/`*.yml` file in the rules directory is loaded. Unknown keys, unknown fields, and duplicate IDs stop the agent at startup.
+
+```yaml
+rules:
+  - id: EDR-002
+    title: Shell spawned by a web server
+    severity: high            # low | medium | high | critical
+    kind: process_exec        # process_exec | process_exit | file_open | net_connect (omit = any)
+    action: kill              # alert (default) | kill
+    match:                    # all conditions must match
+      - field: process.comm
+        in: [sh, bash, dash, zsh]
+      - field: process.parent_comm
+        in: [nginx, apache2, httpd, php-fpm, node]
+```
+
+Each condition has exactly one of these operators: `equals`, `contains`, `startswith`, `endswith`, `in`. Fields: `kind`, `process.{pid,ppid,uid,comm,exe,args,parent_comm}`, `file.path`, `network.{family,dst_ip,dst_port}`.
+
+Example alert:
+
+```json
+{"type":"alert","data":{"rule_id":"EDR-001","title":"Known cryptocurrency miner executed","severity":"critical","action":"kill","event":{"kind":"process_exec","process":{"pid":7538,"comm":"xmrig","exe":"/tmp/.../xmrig", "...":"..."}},"response":{"action":"kill","status":"killed"}}}
+```
+
+## Known limitations
+
+- Kill targets a PID; a PID reused between detection and response could be hit (pidfd targeting would close this).
+- `openat` paths are read at syscall entry: they can be relative, and are empty if the user page is not resident. `open`, `openat2` and `execveat` paths are not hooked.
+- Exe/args/parent are only known for processes started after the agent. Older processes get `comm` and pid only.
+- Detection is per event (no sequences or time windows). There are no `not` conditions, no central server, and no tamper protection.
+- Kernel 7.x BTF needs clang `-fms-extensions` (set in `gen.go`).
