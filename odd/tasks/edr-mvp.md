@@ -18,7 +18,7 @@ Branch: `feat/edr-mvp` · Delivery: ask-on-risk · Test runner: `go test ./...` 
 - [x] T1 S3,S6,S7 — scaffold, dev image, domain model, JSONL sink · route: inline
 - [x] T2 S4,S7 — rule engine + YAML loader + default rules · route: inline
 - [x] T3 S5 — response (kill) + dry-run · route: inline
-- [ ] T4 S2 — eBPF probes (C) + Go loader adapter · route: inline
+- [x] T4 S2 — eBPF probes (C) + Go loader adapter · route: inline
 - [ ] T5 S2-S6 — agent wiring (cmd) + e2e in privileged container + README · route: inline
 
 Route evidence: single sequential dependency chain, no parallel units → no Writer trigger; all inline.
@@ -28,3 +28,4 @@ Route evidence: single sequential dependency chain, no parallel units → no Wri
 - L1 (2026-11-20) User: "Construyamos un Endpoint Detection and Response (EDR)"
 - L2 (2026-11-20) User chose "Linux + eBPF (Recommended)".
 - L3 Env: no Go on host; Docker Desktop 29.8.0, kernel 7.0.12-linuxkit aarch64, BTF present, tracepoints sys_enter_{execve,openat,connect} and sched_process_{exec,exit,fork} available.
+- L4 T4: kernel 7.0 BTF uses MS-style anonymous struct members; clang 14 needs `-fms-extensions -Wno-microsoft-anon-tag` (dropping them would corrupt struct layouts). Containers lack tracefs: sensor mounts it when missing. Agent must run with `--pid=host` so BPF pids match kill targets. e2e (exec/open/connect/exit + self-filter) PASS on 7.0.12-linuxkit arm64.

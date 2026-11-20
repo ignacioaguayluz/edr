@@ -5,7 +5,7 @@ IMAGE      ?= edr-dev
 RUNTIME    ?= edr-agent
 GOCACHE_VOL = edr-gocache
 DOCKER_RUN  = docker run --rm -v $(CURDIR):/src -v $(GOCACHE_VOL):/root/.cache -w /src
-PRIV_RUN    = $(DOCKER_RUN) --privileged -v /sys/kernel/btf:/sys/kernel/btf:ro
+PRIV_RUN    = $(DOCKER_RUN) --privileged --pid=host
 
 BPF_DIR = internal/sensor/ebpf/bpf
 
