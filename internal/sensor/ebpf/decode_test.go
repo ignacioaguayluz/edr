@@ -23,7 +23,7 @@ func encode(t *testing.T, r bpfEvent) []byte {
 func fixedWall(ns uint64) time.Time { return time.Unix(0, int64(ns)) }
 
 func base(kind uint32) bpfEvent {
-	r := bpfEvent{TsNs: 5, Kind: kind, Pid: 10, Ppid: 1, Uid: 1000}
+	r := bpfEvent{TsNs: 5, StartNs: 4_200_000_000, Kind: kind, Pid: 10, Ppid: 1, Uid: 1000}
 	copy(r.Comm[:], "bash\x00garbage")
 	return r
 }
@@ -39,7 +39,8 @@ func TestDecodeExec(t *testing.T) {
 		t.Fatal(err)
 	}
 	if ev.Kind != telemetry.KindProcessExec || ev.Process.Exe != "/usr/bin/nc" || ev.Process.Comm != "bash" ||
-		ev.Process.PID != 10 || ev.Process.PPID != 1 || ev.Process.UID != 1000 || !ev.Time.Equal(time.Unix(0, 5)) {
+		ev.Process.PID != 10 || ev.Process.PPID != 1 || ev.Process.UID != 1000 || !ev.Time.Equal(time.Unix(0, 5)) ||
+		ev.Process.StartBootNS != 4_200_000_000 {
 		t.Fatalf("unexpected event: %+v", ev)
 	}
 	if got := ev.Process.Args; len(got) != 3 || got[0] != "nc" || got[2] != "4444" {

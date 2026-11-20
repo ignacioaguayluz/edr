@@ -34,6 +34,7 @@ func decode(raw []byte, monoToWall func(uint64) time.Time) (telemetry.Event, err
 		Time: monoToWall(r.TsNs),
 		Process: telemetry.Process{
 			PID: r.Pid, PPID: r.Ppid, UID: r.Uid, Comm: cString(r.Comm[:]),
+			StartBootNS: r.StartNs,
 		},
 	}
 	switch r.Kind {
