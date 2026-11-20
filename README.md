@@ -18,7 +18,7 @@ kernel (eBPF CO-RE)                    user space (Go)
 | `internal/sensor/ebpf` | eBPF program (`bpf/edr.bpf.c`) and Go loader/decoder |
 | `internal/agent` | Pipeline and process-context enrichment (exe, args, parent) |
 | `internal/detection` | Rule model, YAML loader and engine |
-| `internal/response` | Kill action, dry-run, protected PIDs |
+| `internal/response` | pidfd-based kill, dry-run, protected PIDs |
 | `internal/sink` | JSON Lines output |
 
 `agent`, `detection` and `response` depend only on interfaces and are unit-tested without a kernel.
@@ -36,6 +36,8 @@ make run      # run the agent with ./rules, alerts to stdout
 make run ARGS="--dry-run --emit-events"
 make image-runtime && docker run --rm --privileged --pid=host edr-agent
 ```
+
+Kills target a process instance, not a bare PID. Every event carries the process start time from the kernel. The responder opens a pidfd, checks that `/proc/<pid>/stat` reports the same start time, and only then sends `SIGKILL` through the pidfd. A reused PID is reported as `"status":"gone","error":"pid reused by another process"` and is never signalled. An alert without a start time is not killed (`skipped`).
 
 Flags: `--rules DIR`, `--output FILE|-`, `--dry-run`, `--emit-events` (every event, not only alerts).
 
@@ -70,7 +72,6 @@ Example alert:
 ## Known limitations
 
 - If user space falls behind (or a local user floods `openat`), the 16 MiB ring buffer fills and events are dropped. Drops are counted in the kernel and logged as `telemetry events dropped` every 10s, but they are not recovered.
-- Kill targets a PID; a PID reused between detection and response could be hit (pidfd targeting would close this).
 - `openat` paths are read at syscall entry: they can be relative, and are empty if the user page is not resident. `open`, `openat2` and `execveat` paths are not hooked.
 - Exe/args/parent are only known for processes started after the agent. Older processes get `comm` and pid only.
 - Detection is per event (no sequences or time windows). There are no `not` conditions, no central server, and no tamper protection.

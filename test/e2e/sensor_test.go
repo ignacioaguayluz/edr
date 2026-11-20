@@ -57,7 +57,7 @@ func TestSensorCapturesExecOpenConnectExit(t *testing.T) {
 		case ev := <-events:
 			switch {
 			case ev.Kind == telemetry.KindProcessExec && ev.Process.PID == child:
-				sawExec = ev.Process.Exe == "/bin/bash" && slices.Contains(ev.Process.Args, "-c")
+				sawExec = ev.Process.Exe == "/bin/bash" && slices.Contains(ev.Process.Args, "-c") && ev.Process.StartBootNS > 0
 			case ev.Kind == telemetry.KindFileOpen && ev.File.Path == marker && ev.Process.Comm == "cat":
 				sawOpen = true
 			case ev.Kind == telemetry.KindNetConnect && ev.Process.PID == child:

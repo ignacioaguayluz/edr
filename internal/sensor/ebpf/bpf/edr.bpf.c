@@ -21,6 +21,7 @@ enum event_kind {
 
 struct event {
 	__u64 ts_ns;      // CLOCK_MONOTONIC
+	__u64 start_ns;   // process start, CLOCK_BOOTTIME (identity with pid)
 	__u32 kind;
 	__u32 pid;        // tgid in the initial pid namespace
 	__u32 ppid;
@@ -82,6 +83,9 @@ static __always_inline struct event *new_event(__u32 kind)
 	e->kind = kind;
 	e->pid = tgid;
 	e->ppid = BPF_CORE_READ(task, real_parent, tgid);
+	// The group leader's start time is what /proc/<pid>/stat reports, so
+	// user space can verify it is acting on this exact process instance.
+	e->start_ns = BPF_CORE_READ(task, group_leader, start_boottime);
 	e->uid = (__u32)bpf_get_current_uid_gid();
 	e->exit_code = 0;
 	e->flags = 0;

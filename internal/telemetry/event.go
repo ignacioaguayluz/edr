@@ -29,6 +29,9 @@ type Process struct {
 	Args       []string `json:"args,omitempty"`
 	ParentComm string   `json:"parent_comm,omitempty"`
 	ExitCode   *int     `json:"exit_code,omitempty"`
+	// StartBootNS is the process start time (ns since boot). Together with
+	// PID it identifies one process instance, since PIDs are reused.
+	StartBootNS uint64 `json:"start_boottime_ns,omitempty"`
 }
 
 // File describes a file access.
