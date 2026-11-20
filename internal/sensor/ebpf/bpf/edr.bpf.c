@@ -44,6 +44,23 @@ struct {
 	__uint(max_entries, 1 << 24);
 } events SEC(".maps");
 
+// Events lost because the ring buffer was full (user space too slow or a
+// deliberate flood). Per-CPU, so increments need no atomics.
+struct {
+	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+	__uint(max_entries, 1);
+	__type(key, __u32);
+	__type(value, __u64);
+} dropped SEC(".maps");
+
+static __always_inline void count_drop(void)
+{
+	__u32 key = 0;
+	__u64 *v = bpf_map_lookup_elem(&dropped, &key);
+	if (v)
+		(*v)++;
+}
+
 // Forces BTF emission of struct event for bpf2go -type event.
 const struct event *unused_event __attribute__((unused));
 
@@ -55,8 +72,10 @@ static __always_inline struct event *new_event(__u32 kind)
 		return NULL;
 
 	struct event *e = bpf_ringbuf_reserve(&events, sizeof(*e), 0);
-	if (!e)
+	if (!e) {
+		count_drop();
 		return NULL;
+	}
 
 	struct task_struct *task = (struct task_struct *)bpf_get_current_task();
 	e->ts_ns = bpf_ktime_get_ns();

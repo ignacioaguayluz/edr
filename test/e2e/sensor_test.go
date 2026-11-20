@@ -100,3 +100,25 @@ func TestSensorIgnoresAgentOwnActivity(t *testing.T) {
 		}
 	}
 }
+
+func TestSensorCountsRingBufferDrops(t *testing.T) {
+	sensor, err := ebpf.Open(slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatalf("open sensor: %v", err)
+	}
+	defer sensor.Close()
+
+	// Nobody reads the ring buffer, so a flood of opens must overflow it.
+	flood := exec.Command("/bin/bash", "-c", "for i in $(seq 1 60000); do : < /etc/hostname; done")
+	if err := flood.Run(); err != nil {
+		t.Fatalf("flood: %v", err)
+	}
+	dropped, err := sensor.Dropped()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dropped == 0 {
+		t.Fatal("ring buffer overflowed but no drops were counted")
+	}
+	t.Logf("dropped %d events", dropped)
+}

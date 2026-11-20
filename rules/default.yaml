@@ -11,6 +11,8 @@ rules:
       - field: process.comm
         in: [xmrig, minerd, cpuminer, xmr-stak]
 
+  # node is deliberately excluded: npm scripts, VS Code and other Node
+  # tooling spawn shells legitimately, and this rule kills.
   - id: EDR-002
     title: Shell spawned by a web server
     severity: high
@@ -20,7 +22,7 @@ rules:
       - field: process.comm
         in: [sh, bash, dash, zsh]
       - field: process.parent_comm
-        in: [nginx, apache2, httpd, php-fpm, node]
+        in: [nginx, apache2, httpd, php-fpm]
 
   - id: EDR-003
     title: Outbound connection to a common reverse-shell port
