@@ -17,7 +17,7 @@ Branch: `feat/edr-mvp` · Delivery: ask-on-risk · Test runner: `go test ./...` 
 
 - [x] T1 S3,S6,S7 — scaffold, dev image, domain model, JSONL sink · route: inline
 - [x] T2 S4,S7 — rule engine + YAML loader + default rules · route: inline
-- [ ] T3 S5 — response (kill) + dry-run · route: inline
+- [x] T3 S5 — response (kill) + dry-run · route: inline
 - [ ] T4 S2 — eBPF probes (C) + Go loader adapter · route: inline
 - [ ] T5 S2-S6 — agent wiring (cmd) + e2e in privileged container + README · route: inline
 
