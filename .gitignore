@@ -1,0 +1,4 @@
+/bin/
+internal/sensor/ebpf/bpf/vmlinux.h
+internal/sensor/ebpf/bpf_bpfe*.go
+internal/sensor/ebpf/bpf_bpfe*.o
