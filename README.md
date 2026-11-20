@@ -43,7 +43,7 @@ The agent needs root and the host PID namespace (`--privileged --pid=host` in Do
 
 ## Rules
 
-Every `*.yaml`/`*.yml` file in the rules directory is loaded. Unknown keys, unknown fields, and duplicate IDs stop the agent at startup.
+Every `*.yaml`/`*.yml` file in the rules directory is loaded, including every `---`-separated document. A missing directory, a directory with no rules, unknown keys, unknown fields, and duplicate IDs stop the agent at startup.
 
 ```yaml
 rules:
@@ -56,7 +56,7 @@ rules:
       - field: process.comm
         in: [sh, bash, dash, zsh]
       - field: process.parent_comm
-        in: [nginx, apache2, httpd, php-fpm, node]
+        in: [nginx, apache2, httpd, php-fpm]
 ```
 
 Each condition has exactly one of these operators: `equals`, `contains`, `startswith`, `endswith`, `in`. Fields: `kind`, `process.{pid,ppid,uid,comm,exe,args,parent_comm}`, `file.path`, `network.{family,dst_ip,dst_port}`.
@@ -69,6 +69,7 @@ Example alert:
 
 ## Known limitations
 
+- If user space falls behind (or a local user floods `openat`), the 16 MiB ring buffer fills and events are dropped. Drops are counted in the kernel and logged as `telemetry events dropped` every 10s, but they are not recovered.
 - Kill targets a PID; a PID reused between detection and response could be hit (pidfd targeting would close this).
 - `openat` paths are read at syscall entry: they can be relative, and are empty if the user page is not resident. `open`, `openat2` and `execveat` paths are not hooked.
 - Exe/args/parent are only known for processes started after the agent. Older processes get `comm` and pid only.

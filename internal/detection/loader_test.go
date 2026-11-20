@@ -67,6 +67,54 @@ func TestLoadDirRejectsDuplicateIDsAcrossFiles(t *testing.T) {
 	}
 }
 
+func TestLoadDirReadsEveryYAMLDocumentInAFile(t *testing.T) {
+	second := strings.Replace(validRule, "EDR-1", "EDR-2", 1)
+	rules, err := LoadDir(writeRules(t, map[string]string{"a.yaml": validRule + "---\n" + second}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rules) != 2 || rules[1].ID != "EDR-2" {
+		t.Fatalf("want rules from both documents, got %+v", rules)
+	}
+}
+
+func TestLoadDirRejectsMissingOrEmptyDirectory(t *testing.T) {
+	if _, err := LoadDir(filepath.Join(t.TempDir(), "typo")); err == nil {
+		t.Error("missing directory accepted")
+	}
+	file := filepath.Join(t.TempDir(), "rules.yaml")
+	if err := os.WriteFile(file, []byte(validRule), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadDir(file); err == nil {
+		t.Error("regular file accepted as rules directory")
+	}
+	_, err := LoadDir(writeRules(t, map[string]string{"notes.txt": "x"}))
+	if err == nil || !strings.Contains(err.Error(), "no rules") {
+		t.Errorf("directory without rules: want 'no rules' error, got %v", err)
+	}
+}
+
+func TestShippedWebShellRuleIgnoresNodeParents(t *testing.T) {
+	rules, err := LoadDir("../../rules")
+	if err != nil {
+		t.Fatal(err)
+	}
+	eng := NewEngine(rules)
+	for parent, wantAlert := range map[string]bool{"node": false, "nginx": true} {
+		ev := execEvent("sh", "/bin/sh", parent)
+		got := false
+		for _, a := range eng.Evaluate(ev) {
+			if a.RuleID == "EDR-002" {
+				got = true
+			}
+		}
+		if got != wantAlert {
+			t.Errorf("parent %s: EDR-002 fired=%v, want %v", parent, got, wantAlert)
+		}
+	}
+}
+
 func TestShippedRulesAreValid(t *testing.T) {
 	rules, err := LoadDir("../../rules")
 	if err != nil {

@@ -103,11 +103,53 @@ func (s *Sensor) monoToWall(ns uint64) time.Time {
 	return time.Unix(0, int64(ns)+int64(s.clockOffset))
 }
 
+// Dropped returns the total number of events the kernel discarded because
+// the ring buffer was full.
+func (s *Sensor) Dropped() (uint64, error) {
+	var perCPU []uint64
+	if err := s.objs.Dropped.Lookup(uint32(0), &perCPU); err != nil {
+		return 0, fmt.Errorf("read drop counter: %w", err)
+	}
+	var total uint64
+	for _, v := range perCPU {
+		total += v
+	}
+	return total, nil
+}
+
+// DropCheckInterval is how often Run reports new ring buffer drops.
+var DropCheckInterval = 10 * time.Second
+
+// reportDrops logs a warning whenever the kernel drop counter grows, so
+// telemetry loss (e.g. an attacker flooding opens) is never silent.
+func (s *Sensor) reportDrops(ctx context.Context) {
+	t := time.NewTicker(DropCheckInterval)
+	defer t.Stop()
+	var last uint64
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			total, err := s.Dropped()
+			if err != nil {
+				s.log.Warn("drop counter unavailable", "err", err)
+				continue
+			}
+			if total > last {
+				s.log.Warn("telemetry events dropped: ring buffer full", "new", total-last, "total", total)
+				last = total
+			}
+		}
+	}
+}
+
 // Run streams decoded events to out until ctx is cancelled. Malformed
-// records are logged and skipped.
+// records are logged and skipped; kernel-side drops are logged periodically.
 func (s *Sensor) Run(ctx context.Context, out chan<- telemetry.Event) error {
 	stop := context.AfterFunc(ctx, func() { s.reader.Close() })
 	defer stop()
+	go s.reportDrops(ctx)
 	for {
 		rec, err := s.reader.Read()
 		if err != nil {
